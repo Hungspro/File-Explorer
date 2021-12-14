@@ -14,10 +14,12 @@ namespace WindowExplorers
 {
     public partial class Form1 : Form
     {
-
+        private ListViewColumnSorter lvwColumnSorter;
         public Form1()
         {
             InitializeComponent();
+            lvwColumnSorter = new ListViewColumnSorter();
+            this.listView.ListViewItemSorter = lvwColumnSorter;
         }
 
         private void listView1_SelectedIndexChanged(object sender, EventArgs e)
@@ -85,23 +87,28 @@ namespace WindowExplorers
                         item.SubItems.Add(strDate);
                         var stringType = "File Folder";
                         item.SubItems.Add(stringType);
+                        item.SubItems.Add("");
                         item.ImageIndex = 0;
 
                         listView.Items.Add(item);
                     }
 
-                    string[] files = Directory.GetFiles(path);
-
-                    foreach (string file in files)
+                    DirectoryInfo dirParent = new DirectoryInfo(path);
+                    listView.BeginUpdate();
+                    foreach (FileInfo fileInfo in dirParent.GetFiles())
                     {
-                        FileInfo fileInfo = new FileInfo(file);
-                        var item = new ListViewItem(Path.GetFileName(file));
-                        var date = File.GetLastWriteTime(file);
+                        Icon iconForFile = SystemIcons.WinLogo;
+
+                        var item = new ListViewItem(fileInfo.Name);
+                        var date = fileInfo.LastWriteTime;
                         var strDate = date.ToShortDateString();
                         item.SubItems.Add(strDate);
-                        var extension = Path.GetExtension(file);
+                        var extension = fileInfo.Extension;
                         var key = extension.Substring(1);
                         var type = Extension.getType(key);
+                        
+
+
                         if (type != null)
                         {
                             item.SubItems.Add(type);
@@ -112,10 +119,22 @@ namespace WindowExplorers
                         }
 
 
-                        item.SubItems.Add(fileInfo.Length.ToString());
+                        var bytes = fileInfo.Length / 1024;
+                        var size = bytes + " KB";
+                        item.SubItems.Add(size);
+
+                        //Add icon 
+                        if (!imageListSmallIcon.Images.ContainsKey(fileInfo.Extension))
+                        {
+                            iconForFile = System.Drawing.Icon.ExtractAssociatedIcon(fileInfo.FullName);
+                            imageListSmallIcon.Images.Add(fileInfo.Extension, iconForFile);
+                        }
+                        item.ImageKey = fileInfo.Extension;
 
                         listView.Items.Add(item);
                     }
+                    txtPath.Text = path;
+                    listView.EndUpdate();
                 }
                 else
                 {
@@ -184,7 +203,47 @@ namespace WindowExplorers
 
         private void toolStripButton1_Click(object sender, EventArgs e)
         {
+            DirectoryInfo di = Directory.CreateDirectory(txtPath.Text);
+            updateListView(txtPath.Text);
+        }
 
+        private void listView_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            if(listView.SelectedItems.Count == 1)
+            {
+                ListViewItem selectedItem = listView.SelectedItems[0];
+                if(selectedItem.SubItems[2].Text == "File Folder")
+                {
+                    var path = txtPath.Text + "\\" + selectedItem.SubItems[0].Text;
+                    updateListView(path);
+                }
+            }
+        }
+
+        private void listView_ColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            // Determine if clicked column is already the column that is being sorted.
+            if (e.Column == lvwColumnSorter.SortColumn)
+            {
+                // Reverse the current sort direction for this column.
+                if (lvwColumnSorter.Order == SortOrder.Ascending)
+                {
+                    lvwColumnSorter.Order = SortOrder.Descending;
+                }
+                else
+                {
+                    lvwColumnSorter.Order = SortOrder.Ascending;
+                }
+            }
+            else
+            {
+                // Set the column number that is to be sorted; default to ascending.
+                lvwColumnSorter.SortColumn = e.Column;
+                lvwColumnSorter.Order = SortOrder.Ascending;
+            }
+
+            // Perform the sort with these new sort options.
+            this.listView.Sort();
         }
     }
 }
